@@ -78,7 +78,8 @@ jobs:
           /usr/libexec/PlistBuddy -c 'Print :NSBluetoothPeripheralUsageDescription' "$PLIST"
           /usr/libexec/PlistBuddy -c 'Print :NSCameraUsageDescription' "$PLIST"
           test "$(/usr/libexec/PlistBuddy -c 'Print :MinimumOSVersion' "$PLIST")" = "16.0"
-          file "$APP_PATH/AirTrace" | grep -q 'Mach-O 64-bit arm64'
+          file "$APP_PATH/AirTrace"
+          lipo -archs "$APP_PATH/AirTrace" | tr ' ' '\n' | grep -qx arm64
           otool -L "$APP_PATH/AirTrace"
 
       - name: Package unsigned IPA
