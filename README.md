@@ -1,6 +1,6 @@
 # AirTrace
 
-AirTrace is an **AirPods-only spatial finder for iOS 15+**. It combines Apple Proximity Pairing BLE observations with ARKit world tracking to estimate a 3D probability region for hidden AirPods while the user walks around a room.
+AirTrace is an **AirPods-only spatial finder for iOS 16 through iOS 27**. It combines Apple Proximity Pairing BLE observations with ARKit world tracking to estimate a 3D probability region for hidden AirPods while the user walks around a room.
 
 ## What it does
 
@@ -39,7 +39,7 @@ xcodebuild \
   build
 ```
 
-Deployment target: **iOS 15.0**. The app uses runtime feature detection for LiDAR/scene reconstruction and remains forward-compatible with newer iOS releases.
+Deployment target: **iOS 16.0**. The app uses runtime feature detection for LiDAR/scene reconstruction and remains forward-compatible through iOS 27.
 
 ## Unsigned IPA
 
