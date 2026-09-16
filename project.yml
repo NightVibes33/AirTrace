@@ -1,0 +1,57 @@
+name: AirTrace
+options:
+  bundleIdPrefix: com.nightvibes33
+  deploymentTarget:
+    iOS: "15.0"
+  createIntermediateGroups: true
+settings:
+  base:
+    SWIFT_VERSION: "5.9"
+    IPHONEOS_DEPLOYMENT_TARGET: "15.0"
+    TARGETED_DEVICE_FAMILY: "1,2"
+    CODE_SIGNING_ALLOWED: NO
+    CODE_SIGNING_REQUIRED: NO
+    CODE_SIGN_IDENTITY: ""
+targets:
+  AirTrace:
+    type: application
+    platform: iOS
+    sources:
+      - path: Sources/AirTrace
+    info:
+      path: Resources/Info.plist
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.nightvibes33.AirTrace
+        PRODUCT_NAME: AirTrace
+        MARKETING_VERSION: "1.0.0"
+        CURRENT_PROJECT_VERSION: "1"
+        INFOPLIST_FILE: Resources/Info.plist
+        GENERATE_INFOPLIST_FILE: NO
+        ENABLE_USER_SCRIPT_SANDBOXING: YES
+    dependencies:
+      - sdk: ARKit.framework
+      - sdk: SceneKit.framework
+      - sdk: CoreBluetooth.framework
+      - sdk: CoreMotion.framework
+      - sdk: AVFAudio.framework
+  AirTraceTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: Tests/AirTraceTests
+    dependencies:
+      - target: AirTrace
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.nightvibes33.AirTraceTests
+        GENERATE_INFOPLIST_FILE: YES
+schemes:
+  AirTrace:
+    build:
+      targets:
+        AirTrace: all
+        AirTraceTests: [test]
+    test:
+      targets:
+        - AirTraceTests
