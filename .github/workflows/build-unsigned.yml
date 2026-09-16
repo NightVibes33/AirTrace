@@ -66,11 +66,25 @@ jobs:
             DEVELOPMENT_TEAM='' \
             build | tee build-device.log
 
+      - name: Validate runtime app bundle
+        run: |
+          set -euxo pipefail
+          APP_PATH="build/DerivedData/Build/Products/Release-iphoneos/AirTrace.app"
+          PLIST="$APP_PATH/Info.plist"
+          test -d "$APP_PATH"
+          test -f "$APP_PATH/AirTrace"
+          test -f "$PLIST"
+          /usr/libexec/PlistBuddy -c 'Print :NSBluetoothAlwaysUsageDescription' "$PLIST"
+          /usr/libexec/PlistBuddy -c 'Print :NSBluetoothPeripheralUsageDescription' "$PLIST"
+          /usr/libexec/PlistBuddy -c 'Print :NSCameraUsageDescription' "$PLIST"
+          test "$(/usr/libexec/PlistBuddy -c 'Print :MinimumOSVersion' "$PLIST")" = "16.0"
+          file "$APP_PATH/AirTrace" | grep -q 'Mach-O 64-bit arm64'
+          otool -L "$APP_PATH/AirTrace"
+
       - name: Package unsigned IPA
         run: |
           set -euxo pipefail
           APP_PATH="build/DerivedData/Build/Products/Release-iphoneos/AirTrace.app"
-          test -d "$APP_PATH"
           rm -rf Payload AirTrace-unsigned.ipa
           mkdir -p Payload
           ditto "$APP_PATH" Payload/AirTrace.app
