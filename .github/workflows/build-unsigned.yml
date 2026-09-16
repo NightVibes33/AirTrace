@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   build:
-    name: AirTrace iOS 15+ unsigned
+    name: AirTrace iOS 16–27 unsigned
     runs-on: macos-26
     timeout-minutes: 30
 
