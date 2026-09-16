@@ -1,0 +1,100 @@
+name: Build Unsigned IPA
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: AirTrace iOS 15+ unsigned
+    runs-on: macos-26
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Toolchain info
+        run: |
+          set -euxo pipefail
+          xcodebuild -version
+          xcrun --sdk iphoneos --show-sdk-version
+          sw_vers
+
+      - name: Install XcodeGen
+        run: |
+          if ! command -v xcodegen >/dev/null 2>&1; then
+            brew install xcodegen
+          fi
+          xcodegen --version
+
+      - name: Generate Xcode project
+        run: xcodegen generate
+
+      - name: Simulator compatibility build
+        run: |
+          set -o pipefail
+          xcodebuild \
+            -project AirTrace.xcodeproj \
+            -scheme AirTrace \
+            -configuration Debug \
+            -sdk iphonesimulator \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath build/SimulatorDerivedData \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY='' \
+            build | tee build-simulator.log
+
+      - name: Build unsigned device app
+        run: |
+          set -o pipefail
+          xcodebuild \
+            -project AirTrace.xcodeproj \
+            -scheme AirTrace \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath build/DerivedData \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY='' \
+            DEVELOPMENT_TEAM='' \
+            build | tee build-device.log
+
+      - name: Package unsigned IPA
+        run: |
+          set -euxo pipefail
+          APP_PATH="build/DerivedData/Build/Products/Release-iphoneos/AirTrace.app"
+          test -d "$APP_PATH"
+          rm -rf Payload AirTrace-unsigned.ipa
+          mkdir -p Payload
+          ditto "$APP_PATH" Payload/AirTrace.app
+          /usr/bin/zip -qry AirTrace-unsigned.ipa Payload
+          shasum -a 256 AirTrace-unsigned.ipa | tee AirTrace-unsigned.ipa.sha256
+          ls -lh AirTrace-unsigned.ipa
+
+      - name: Upload unsigned IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: AirTrace-unsigned-ipa
+          path: |
+            AirTrace-unsigned.ipa
+            AirTrace-unsigned.ipa.sha256
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload build logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: AirTrace-build-logs
+          path: |
+            build-simulator.log
+            build-device.log
+          if-no-files-found: ignore
+          retention-days: 14
