@@ -15,7 +15,7 @@ concurrency:
 jobs:
   build:
     name: AirTrace iOS 16–27 unsigned
-    runs-on: macos-26
+    runs-on: macos-15
     timeout-minutes: 30
 
     steps:
