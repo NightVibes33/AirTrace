@@ -61,6 +61,28 @@ struct AirPodsAdvertisement: Equatable {
     }
 }
 
+struct FindMyAirPodsBeacon: Identifiable, Equatable {
+    enum State: String, Codable {
+        case nearby = "Nearby"
+        case separated = "Separated"
+        case unknown = "Unknown"
+    }
+
+    let id: UUID
+    let peripheralID: UUID
+    let rssi: Int
+    let statusByte: UInt8
+    let state: State
+    let batteryLevel: Int?
+    let rawPayload: Data
+    let firstSeen: Date
+    let lastSeen: Date
+    let packetCount: Int
+
+    var deviceTypeBits: UInt8 { (statusByte >> 4) & 0b11 }
+    var isAirPods: Bool { deviceTypeBits == 0b11 }
+}
+
 struct DiscoveredAirPods: Identifiable, Equatable {
     let id: UUID
     let peripheralID: UUID
