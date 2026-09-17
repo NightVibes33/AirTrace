@@ -6,7 +6,7 @@ struct AirTraceApp: App {
 
     var body: some Scene {
         WindowGroup {
-            RootView(search: search)
+            FindMyProbeView(search: search)
                 .preferredColorScheme(.dark)
         }
     }
