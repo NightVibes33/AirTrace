@@ -35,8 +35,38 @@ final class AirTraceTests: XCTestCase {
     }
 
     func testRejectsNonProximityApplePacket() {
-        let payload = Data([0x4C, 0x00, 0x12, 0x19, 0x01, 0x0E, 0x20])
+        let payload = Data([0x4C, 0x00, 0x12, 0x19, 0x30, 0xAA, 0xBB])
         XCTAssertNil(AirPodsPacketParser.parse(manufacturerData: payload, rssi: -45))
+    }
+
+    func testParsesSeparatedFindMyAirPodsFrame() {
+        let payload = Data([
+            0x4C, 0x00,
+            0x12, 0x19,
+            0x70, // battery=medium, device type bits=0b11 (AirPods)
+            0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77
+        ])
+        let parsed = FindMyAirPodsPacketParser.parse(manufacturerData: payload, rssi: -63)
+        XCTAssertNotNil(parsed)
+        XCTAssertEqual(parsed?.state, .separated)
+        XCTAssertEqual((parsed!.statusByte & 0x30) >> 4, 3)
+        XCTAssertEqual(parsed?.batteryLevel, 66)
+    }
+
+    func testParsesNearbyFindMyAirPodsFrame() {
+        let payload = Data([0x12, 0x02, 0x30, 0xC0])
+        let parsed = FindMyAirPodsPacketParser.parse(manufacturerData: payload, rssi: -48)
+        XCTAssertEqual(parsed?.state, .nearby)
+    }
+
+    func testFindMyParserRejectsAirTagType() {
+        let payload = Data([0x4C, 0x00, 0x12, 0x19, 0x10, 0xAA, 0xBB])
+        XCTAssertNil(FindMyAirPodsPacketParser.parse(manufacturerData: payload, rssi: -52))
+    }
+
+    func testFindMyPacketTypeDiagnostic() {
+        let payload = Data([0x4C, 0x00, 0x12, 0x19, 0x30])
+        XCTAssertEqual(FindMyAirPodsPacketParser.applePacketType(manufacturerData: payload), 0x12)
     }
 
     func testRSSIDistanceIsMonotonic() {
