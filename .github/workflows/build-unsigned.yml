@@ -29,6 +29,16 @@ jobs:
           xcrun --sdk iphoneos --show-sdk-version
           sw_vers
 
+      - name: Probe Find My private SDK surface
+        run: |
+          set -u
+          SDK="$(xcrun --sdk iphoneos --show-sdk-path)"
+          echo "SDK=$SDK"
+          echo "--- iPhoneOS SDK FindMyBluetooth candidates ---"
+          find "$SDK/System/Library" -maxdepth 5 \( -iname '*FindMyBluetooth*' -o -iname '*SPOwner*' \) -print 2>/dev/null || true
+          echo "--- Xcode-wide FindMyBluetooth candidates ---"
+          find /Applications/Xcode.app -path '*FindMyBluetooth.framework*' -print 2>/dev/null | head -100 || true
+
       - name: Install XcodeGen
         run: |
           if ! command -v xcodegen >/dev/null 2>&1; then
