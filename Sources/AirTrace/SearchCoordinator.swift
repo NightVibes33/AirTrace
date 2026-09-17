@@ -6,6 +6,7 @@ final class SearchCoordinator: ObservableObject {
     let scanner: AirPodsScanner
 
     @Published private(set) var target: TargetProfile?
+    @Published private(set) var selectedFindMyBeaconID: UUID?
     @Published private(set) var estimate: LocalizationEstimate = .empty
     @Published private(set) var phase: SearchPhase = .idle
     @Published private(set) var guidance = "Start a search and walk around the room."
@@ -32,6 +33,9 @@ final class SearchCoordinator: ObservableObject {
         scanner.onAirPodsObservation = { [weak self] observation in
             self?.handle(observation)
         }
+        scanner.onFindMyObservation = { [weak self] beacon in
+            self?.handleFindMy(beacon)
+        }
     }
 
     func beginDiscovery() {
@@ -41,7 +45,25 @@ final class SearchCoordinator: ObservableObject {
     func enroll(_ discovered: DiscoveredAirPods) {
         let profile = TargetProfile.fresh(from: discovered)
         target = profile
+        selectedFindMyBeaconID = nil
         saveTarget(profile)
+    }
+
+    func selectFindMyBeacon(_ beacon: FindMyAirPodsBeacon) {
+        selectedFindMyBeaconID = beacon.peripheralID
+        latestRSSI = beacon.rssi
+        guidance = "AirPods Find My beacon selected. Start a 3D search and walk around it."
+    }
+
+    func clearFindMySelection() {
+        if searchActive { stopSearch(saveRecord: false) }
+        selectedFindMyBeaconID = nil
+        latestRSSI = nil
+    }
+
+    var selectedFindMyBeacon: FindMyAirPodsBeacon? {
+        guard let id = selectedFindMyBeaconID else { return nil }
+        return scanner.findMyBeacon(id: id)
     }
 
     func forgetTarget() {
@@ -58,23 +80,30 @@ final class SearchCoordinator: ObservableObject {
     }
 
     func startSearch(mode: SearchMode) {
-        guard let target else {
+        guard target != nil || selectedFindMyBeaconID != nil else {
             phase = .unavailable
-            guidance = "Enroll your AirPods first."
+            guidance = "Select a detected AirPods Find My beacon first."
             return
         }
+
         self.mode = mode
         estimate = .empty
         sampleCount = 0
         trajectorySpan = 0
         surfaceHint = nil
-        latestRSSI = nil
+        latestRSSI = selectedFindMyBeacon?.rssi
         lastAcceptedSampleAt = 0
         startedAt = Date()
         searchActive = true
         phase = .acquiring
-        guidance = "Walk slowly until AirTrace locks onto your AirPods signal."
-        engine.reset(referenceRSSI: target.referenceRSSIAtOneMeter, mode: mode)
+        guidance = selectedFindMyBeaconID != nil
+            ? "Walk slowly while AirTrace collects the closed-case AirPods Find My signal."
+            : "Walk slowly until AirTrace locks onto your AirPods signal."
+
+        // Find My frames do not expose a calibrated Tx power. Use a conservative
+        // reference RSSI until device-specific calibration data is available.
+        let reference = target?.referenceRSSIAtOneMeter ?? -58
+        engine.reset(referenceRSSI: reference, mode: mode)
         scanner.start()
     }
 
@@ -118,13 +147,24 @@ final class SearchCoordinator: ObservableObject {
         return "NEARBY"
     }
 
+    private func handleFindMy(_ beacon: FindMyAirPodsBeacon) {
+        guard beacon.isAirPods,
+              let selectedID = selectedFindMyBeaconID,
+              beacon.peripheralID == selectedID
+        else { return }
+
+        latestRSSI = beacon.rssi
+        ingestRSSI(beacon.rssi, timestamp: beacon.lastSeen.timeIntervalSince1970)
+    }
+
     private func handle(_ observation: DiscoveredAirPods) {
-        guard let target, observation.model == target.model else { return }
+        guard selectedFindMyBeaconID == nil,
+              let target,
+              observation.model == target.model
+        else { return }
 
         if let savedID = target.peripheralID {
             if observation.peripheralID != savedID {
-                // Identifiers can change, so fall back only if the saved one is no longer
-                // visible and this is currently the strongest same-model AirPods candidate.
                 if scanner.candidates.contains(where: { $0.peripheralID == savedID }) { return }
                 guard scanner.bestMatch(for: target)?.peripheralID == observation.peripheralID else { return }
             }
@@ -133,20 +173,23 @@ final class SearchCoordinator: ObservableObject {
         }
 
         latestRSSI = observation.rssi
+        ingestRSSI(observation.rssi, timestamp: observation.advertisement.timestamp)
+    }
+
+    private func ingestRSSI(_ rssi: Int, timestamp: TimeInterval) {
         guard searchActive, let transform = latestTransform else { return }
 
-        let now = observation.advertisement.timestamp
         let minInterval: TimeInterval = mode == .precision ? 0.08 : 0.14
-        guard now - lastAcceptedSampleAt >= minInterval else { return }
-        lastAcceptedSampleAt = now
+        guard timestamp - lastAcceptedSampleAt >= minInterval else { return }
+        lastAcceptedSampleAt = timestamp
 
         let position = SIMD3<Float>(transform.columns.3.x, transform.columns.3.y, transform.columns.3.z)
         let forward = simd_normalize(-SIMD3<Float>(transform.columns.2.x, transform.columns.2.y, transform.columns.2.z))
         let sample = SpatialRadioSample(
             position: position,
             cameraForward: forward,
-            rssi: Double(observation.rssi),
-            timestamp: now
+            rssi: Double(rssi),
+            timestamp: timestamp
         )
 
         let engine = self.engine
@@ -174,7 +217,9 @@ final class SearchCoordinator: ObservableObject {
 
     private func guidanceFor(estimate: LocalizationEstimate, span: Float) -> String {
         if estimate.sampleCount < 8 {
-            return "Keep walking slowly. Collecting AirPods signal samples…"
+            return selectedFindMyBeaconID != nil
+                ? "Keep walking slowly. Collecting Find My AirPods signal samples…"
+                : "Keep walking slowly. Collecting AirPods signal samples…"
         }
         if span < 0.8 {
             return "Move about 4 ft sideways to create another measurement angle."
