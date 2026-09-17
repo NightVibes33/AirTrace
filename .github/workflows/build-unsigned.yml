@@ -8,6 +8,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: airtrace-main-build
+  cancel-in-progress: true
+
 jobs:
   build:
     name: AirTrace iOS 16–27 unsigned
