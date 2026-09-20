@@ -6,7 +6,7 @@ struct AirTraceApp: App {
 
     var body: some Scene {
         WindowGroup {
-            SystemDiscoveryView(search: search)
+            ConnectedAirPodsProbeView(search: search)
                 .preferredColorScheme(.dark)
         }
     }
